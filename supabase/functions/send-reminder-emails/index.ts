@@ -51,19 +51,17 @@ serve(async (req) => {
     console.log(`Found ${upcomingReminders?.length || 0} total upcoming reminders`);
 
     // Filter reminders based on their individual reminder_hours_before setting
-    // A reminder should be sent if we're within the reminder window
+    // A reminder should be sent if we're at or past the reminder threshold (and event hasn't passed)
     const remindersToSend = upcomingReminders?.filter((reminder) => {
       const eventDate = new Date(reminder.event_date);
       const hoursBeforeEvent = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
       const reminderHours = reminder.reminder_hours_before || 24;
       
-      // Send if we're within the reminder window (between 0 and reminder_hours_before hours before event)
-      // and haven't passed the 1-hour before check window (to avoid duplicate sends)
-      const shouldSend = hoursBeforeEvent <= reminderHours && hoursBeforeEvent > (reminderHours - 1);
+      // Send if we're at or past the reminder threshold (hoursBeforeEvent <= reminderHours)
+      // and the event is still in the future (hoursBeforeEvent > 0)
+      const shouldSend = hoursBeforeEvent <= reminderHours && hoursBeforeEvent > 0;
       
-      if (shouldSend) {
-        console.log(`Reminder "${reminder.title}" should be sent: ${hoursBeforeEvent.toFixed(2)} hours before event (window: ${reminderHours}h)`);
-      }
+      console.log(`Reminder "${reminder.title}": ${hoursBeforeEvent.toFixed(2)}h before event, threshold: ${reminderHours}h, shouldSend: ${shouldSend}`);
       
       return shouldSend;
     }) || [];
@@ -216,6 +214,19 @@ serve(async (req) => {
         } else {
           emailsSent++;
           console.log(`Successfully sent reminder email to ${userEmail}`);
+          
+          // Mark these reminders as completed so they don't get sent again
+          const reminderIds = userReminders.map(r => r.id);
+          const { error: updateError } = await supabase
+            .from("pet_events")
+            .update({ reminder_completed: true })
+            .in("id", reminderIds);
+          
+          if (updateError) {
+            console.error(`Error marking reminders as completed:`, updateError);
+          } else {
+            console.log(`Marked ${reminderIds.length} reminders as completed`);
+          }
         }
       } catch (emailErr: unknown) {
         console.error(`Exception sending email to ${userEmail}:`, emailErr);
