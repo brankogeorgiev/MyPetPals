@@ -22,14 +22,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get reminders that are:
-    // 1. Due within the next 24 hours
-    // 2. Not yet completed
-    // 3. Are marked as reminders
+    // Get all upcoming reminders that haven't been completed
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    console.log(`Checking for reminders between ${now.toISOString()} and ${tomorrow.toISOString()}`);
+    console.log(`Checking for reminders that should be sent at ${now.toISOString()}`);
 
     const { data: upcomingReminders, error: remindersError } = await supabase
       .from("pet_events")
@@ -40,30 +36,50 @@ serve(async (req) => {
         event_date,
         event_type,
         pet_id,
-        user_id
+        user_id,
+        reminder_hours_before
       `)
       .eq("is_reminder", true)
       .eq("reminder_completed", false)
-      .gte("event_date", now.toISOString())
-      .lte("event_date", tomorrow.toISOString());
+      .gte("event_date", now.toISOString());
 
     if (remindersError) {
       console.error("Error fetching reminders:", remindersError);
       throw remindersError;
     }
 
-    console.log(`Found ${upcomingReminders?.length || 0} upcoming reminders`);
+    console.log(`Found ${upcomingReminders?.length || 0} total upcoming reminders`);
 
-    if (!upcomingReminders || upcomingReminders.length === 0) {
+    // Filter reminders based on their individual reminder_hours_before setting
+    // A reminder should be sent if we're within the reminder window
+    const remindersToSend = upcomingReminders?.filter((reminder) => {
+      const eventDate = new Date(reminder.event_date);
+      const hoursBeforeEvent = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const reminderHours = reminder.reminder_hours_before || 24;
+      
+      // Send if we're within the reminder window (between 0 and reminder_hours_before hours before event)
+      // and haven't passed the 1-hour before check window (to avoid duplicate sends)
+      const shouldSend = hoursBeforeEvent <= reminderHours && hoursBeforeEvent > (reminderHours - 1);
+      
+      if (shouldSend) {
+        console.log(`Reminder "${reminder.title}" should be sent: ${hoursBeforeEvent.toFixed(2)} hours before event (window: ${reminderHours}h)`);
+      }
+      
+      return shouldSend;
+    }) || [];
+
+    console.log(`${remindersToSend.length} reminders qualify to be sent now`);
+
+    if (remindersToSend.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No reminders to send", count: 0 }),
+        JSON.stringify({ message: "No reminders to send at this time", count: 0 }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
     // Group reminders by user
-    const remindersByUser: Record<string, typeof upcomingReminders> = {};
-    for (const reminder of upcomingReminders) {
+    const remindersByUser: Record<string, typeof remindersToSend> = {};
+    for (const reminder of remindersToSend) {
       if (!remindersByUser[reminder.user_id]) {
         remindersByUser[reminder.user_id] = [];
       }
@@ -107,10 +123,20 @@ serve(async (req) => {
         other: "📌 Event",
       };
 
+      const formatTimeUntil = (hours: number): string => {
+        if (hours < 1) return "less than an hour";
+        if (hours === 1) return "1 hour";
+        if (hours < 24) return `${Math.round(hours)} hours`;
+        const days = Math.round(hours / 24);
+        return days === 1 ? "1 day" : `${days} days`;
+      };
+
       const reminderList = userReminders.map(r => {
         const eventDate = new Date(r.event_date);
         const petName = petNames[r.pet_id] || "Your pet";
         const eventType = eventTypeLabels[r.event_type] || eventTypeLabels.other;
+        const hoursUntil = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const timeUntil = formatTimeUntil(hoursUntil);
         const formattedDate = eventDate.toLocaleDateString("en-US", {
           weekday: "long",
           year: "numeric",
@@ -127,7 +153,10 @@ serve(async (req) => {
               <span style="color: #666;">${r.title}</span>
             </td>
             <td style="padding: 12px; border-bottom: 1px solid #eee; color: #8B5A2B;">${petName}</td>
-            <td style="padding: 12px; border-bottom: 1px solid #eee;">${formattedDate}</td>
+            <td style="padding: 12px; border-bottom: 1px solid #eee;">
+              ${formattedDate}<br>
+              <span style="color: #8B5A2B; font-size: 12px;">In ${timeUntil}</span>
+            </td>
           </tr>
         `;
       }).join("");
@@ -142,7 +171,7 @@ serve(async (req) => {
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #8B5A2B 0%, #D4A574 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 24px;">🐾 Pet Care Reminders</h1>
-            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">You have upcoming events in the next 24 hours</p>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">You have upcoming pet care events</p>
           </div>
           
           <div style="background: #fff; padding: 20px; border: 1px solid #eee; border-top: none; border-radius: 0 0 12px 12px;">
@@ -201,7 +230,7 @@ serve(async (req) => {
       JSON.stringify({
         message: "Reminder emails processed",
         emailsSent,
-        totalReminders: upcomingReminders.length,
+        totalReminders: remindersToSend.length,
         errors: errors.length > 0 ? errors : undefined,
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }

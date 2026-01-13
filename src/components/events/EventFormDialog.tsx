@@ -46,6 +46,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
     event_date: '',
     event_time: '',
     is_reminder: false,
+    reminder_hours_before: 24,
   });
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         event_date: format(eventDate, 'yyyy-MM-dd'),
         event_time: format(eventDate, 'HH:mm'),
         is_reminder: event.is_reminder,
+        reminder_hours_before: event.reminder_hours_before || 24,
       });
       setPhotoPreview(event.photo_url);
     } else {
@@ -69,6 +71,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         event_date: format(now, 'yyyy-MM-dd'),
         event_time: format(now, 'HH:mm'),
         is_reminder: false,
+        reminder_hours_before: 24,
       });
       setPhotoPreview(null);
     }
@@ -139,6 +142,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         event_date: eventDateTime.toISOString(),
         photo_url: photoUrl,
         is_reminder: formData.is_reminder,
+        reminder_hours_before: formData.is_reminder ? formData.reminder_hours_before : null,
       };
       
       if (event) {
@@ -241,15 +245,41 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <Label htmlFor="is_reminder" className="cursor-pointer">
-              Set as reminder
-            </Label>
-            <Switch
-              id="is_reminder"
-              checked={formData.is_reminder}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_reminder: checked })}
-            />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="is_reminder" className="cursor-pointer">
+                Set as reminder
+              </Label>
+              <Switch
+                id="is_reminder"
+                checked={formData.is_reminder}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_reminder: checked })}
+              />
+            </div>
+            
+            {formData.is_reminder && (
+              <div className="space-y-2 pl-1">
+                <Label htmlFor="reminder_hours_before">Remind me</Label>
+                <Select
+                  value={formData.reminder_hours_before.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, reminder_hours_before: parseInt(value) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 hour before</SelectItem>
+                    <SelectItem value="3">3 hours before</SelectItem>
+                    <SelectItem value="6">6 hours before</SelectItem>
+                    <SelectItem value="12">12 hours before</SelectItem>
+                    <SelectItem value="24">1 day before</SelectItem>
+                    <SelectItem value="48">2 days before</SelectItem>
+                    <SelectItem value="72">3 days before</SelectItem>
+                    <SelectItem value="168">1 week before</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

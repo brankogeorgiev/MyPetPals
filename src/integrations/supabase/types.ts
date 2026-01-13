@@ -25,6 +25,7 @@ export type Database = {
           pet_id: string
           photo_url: string | null
           reminder_completed: boolean
+          reminder_hours_before: number | null
           title: string
           updated_at: string
           user_id: string
@@ -39,6 +40,7 @@ export type Database = {
           pet_id: string
           photo_url?: string | null
           reminder_completed?: boolean
+          reminder_hours_before?: number | null
           title: string
           updated_at?: string
           user_id: string
@@ -53,6 +55,7 @@ export type Database = {
           pet_id?: string
           photo_url?: string | null
           reminder_completed?: boolean
+          reminder_hours_before?: number | null
           title?: string
           updated_at?: string
           user_id?: string
