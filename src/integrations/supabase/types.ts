@@ -17,11 +17,13 @@ export type Database = {
       pet_events: {
         Row: {
           created_at: string
+          custom_type: string | null
           description: string | null
           event_date: string
           event_type: string
           id: string
           is_reminder: boolean
+          location: string | null
           pet_id: string
           photo_url: string | null
           reminder_completed: boolean
@@ -32,11 +34,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_type?: string | null
           description?: string | null
           event_date: string
           event_type: string
           id?: string
           is_reminder?: boolean
+          location?: string | null
           pet_id: string
           photo_url?: string | null
           reminder_completed?: boolean
@@ -47,11 +51,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_type?: string | null
           description?: string | null
           event_date?: string
           event_type?: string
           id?: string
           is_reminder?: boolean
+          location?: string | null
           pet_id?: string
           photo_url?: string | null
           reminder_completed?: boolean

@@ -24,11 +24,11 @@ interface EventFormDialogProps {
   onSuccess: () => void;
 }
 
-const eventTypes = [
+const appointmentTypes = [
   { value: 'vet_visit', label: 'Vet Visit' },
   { value: 'grooming', label: 'Grooming' },
   { value: 'medication', label: 'Medication' },
-  { value: 'appointment', label: 'Appointment' },
+  { value: 'general', label: 'General' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -42,6 +42,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
   const [formData, setFormData] = useState({
     title: '',
     event_type: 'vet_visit',
+    custom_type: '',
+    location: '',
     description: '',
     event_date: '',
     event_time: '',
@@ -55,6 +57,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
       setFormData({
         title: event.title,
         event_type: event.event_type,
+        custom_type: event.custom_type || '',
+        location: event.location || '',
         description: event.description || '',
         event_date: format(eventDate, 'yyyy-MM-dd'),
         event_time: format(eventDate, 'HH:mm'),
@@ -67,6 +71,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
       setFormData({
         title: '',
         event_type: 'vet_visit',
+        custom_type: '',
+        location: '',
         description: '',
         event_date: format(now, 'yyyy-MM-dd'),
         event_time: format(now, 'HH:mm'),
@@ -138,6 +144,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         user_id: user.id,
         title: formData.title.trim(),
         event_type: formData.event_type,
+        custom_type: formData.event_type === 'other' ? formData.custom_type.trim() || null : null,
+        location: formData.location.trim() || null,
         description: formData.description.trim() || null,
         event_date: eventDateTime.toISOString(),
         photo_url: photoUrl,
@@ -154,8 +162,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         if (error) throw error;
         
         toast({
-          title: 'Event updated',
-          description: 'The event has been updated successfully.',
+          title: 'Appointment updated',
+          description: 'The appointment has been updated successfully.',
         });
       } else {
         const { error } = await supabase
@@ -165,8 +173,8 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
         if (error) throw error;
         
         toast({
-          title: 'Event added',
-          description: 'The event has been added successfully.',
+          title: 'Appointment added',
+          description: 'The appointment has been added successfully.',
         });
       }
       
@@ -188,7 +196,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">
-            {event ? 'Edit Event' : 'Add Event'}
+            {event ? 'Edit Appointment' : 'Add Appointment'}
           </DialogTitle>
         </DialogHeader>
         
@@ -214,11 +222,33 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {eventTypes.map((type) => (
+                {appointmentTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {formData.event_type === 'other' && (
+            <div className="space-y-2">
+              <Label htmlFor="custom_type">Custom Type (optional)</Label>
+              <Input
+                id="custom_type"
+                value={formData.custom_type}
+                onChange={(e) => setFormData({ ...formData, custom_type: e.target.value })}
+                placeholder="e.g., Training session"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="location">Location (optional)</Label>
+            <Input
+              id="location"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              placeholder="e.g., Happy Paws Vet Clinic, 123 Main St"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -327,7 +357,7 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : event ? 'Save Changes' : 'Add Event'}
+              {isLoading ? 'Saving...' : event ? 'Save Changes' : 'Add Appointment'}
             </Button>
           </div>
         </form>

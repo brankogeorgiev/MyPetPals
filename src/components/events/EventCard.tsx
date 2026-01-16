@@ -8,7 +8,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, Stethoscope, Scissors, Pill, Calendar, Clock } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Stethoscope, Scissors, Pill, Calendar, Clock, MapPin } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -23,17 +23,18 @@ interface EventCardProps {
   petName?: string;
 }
 
-const eventTypeConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+const appointmentTypeConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   vet_visit: { icon: <Stethoscope className="w-4 h-4" />, label: 'Vet Visit', color: 'bg-info/10 text-info border-info/20' },
   grooming: { icon: <Scissors className="w-4 h-4" />, label: 'Grooming', color: 'bg-pet-cat/10 text-pet-cat border-pet-cat/20' },
   medication: { icon: <Pill className="w-4 h-4" />, label: 'Medication', color: 'bg-warning/10 text-warning border-warning/20' },
-  appointment: { icon: <Calendar className="w-4 h-4" />, label: 'Appointment', color: 'bg-primary/10 text-primary border-primary/20' },
-  other: { icon: <Clock className="w-4 h-4" />, label: 'Event', color: 'bg-muted text-muted-foreground border-border' },
+  general: { icon: <Calendar className="w-4 h-4" />, label: 'General', color: 'bg-primary/10 text-primary border-primary/20' },
+  other: { icon: <Clock className="w-4 h-4" />, label: 'Other', color: 'bg-muted text-muted-foreground border-border' },
 };
 
 export function EventCard({ event, onEdit, onDelete, onToggleComplete, showPetName, petName }: EventCardProps) {
   const eventDate = new Date(event.event_date);
-  const config = eventTypeConfig[event.event_type] || eventTypeConfig.other;
+  const config = appointmentTypeConfig[event.event_type] || appointmentTypeConfig.other;
+  const displayLabel = event.event_type === 'other' && event.custom_type ? event.custom_type : config.label;
   const isCompleted = event.reminder_completed;
   const isPastEvent = isPast(eventDate) && !isToday(eventDate);
   const isTodayEvent = isToday(eventDate);
@@ -56,7 +57,7 @@ export function EventCard({ event, onEdit, onDelete, onToggleComplete, showPetNa
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant="outline" className={config.color}>
                     {config.icon}
-                    <span className="ml-1">{config.label}</span>
+                    <span className="ml-1">{displayLabel}</span>
                   </Badge>
                   {isTodayEvent && (
                     <Badge className="bg-primary text-primary-foreground">Today</Badge>
@@ -77,6 +78,13 @@ export function EventCard({ event, onEdit, onDelete, onToggleComplete, showPetNa
                 <p className="text-sm text-muted-foreground mt-1">
                   {format(eventDate, 'PPP')} at {format(eventDate, 'p')}
                 </p>
+
+                {event.location && (
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {event.location}
+                  </p>
+                )}
                 
                 {event.description && (
                   <p className="text-sm mt-2 text-foreground/80">{event.description}</p>
@@ -86,7 +94,7 @@ export function EventCard({ event, onEdit, onDelete, onToggleComplete, showPetNa
                   <div className="mt-3">
                     <img
                       src={event.photo_url}
-                      alt="Event photo"
+                      alt="Appointment photo"
                       className="rounded-lg max-h-32 object-cover"
                     />
                   </div>
