@@ -192,7 +192,7 @@ export default function PetDetail() {
               </Badge>
               <Badge variant="outline" className="text-sm">
                 <History className="w-4 h-4 mr-1" />
-                {pastEvents.length} past events
+                {pastEvents.length} past
               </Badge>
             </div>
           </div>
@@ -201,10 +201,10 @@ export default function PetDetail() {
         {/* Events Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-semibold">Events & Reminders</h2>
+            <h2 className="text-xl font-display font-semibold">Appointments & Reminders</h2>
             <Button onClick={() => { setEditingEvent(null); setShowEventForm(true); }} className="gap-2">
               <Plus className="w-4 h-4" />
-              Add Event
+              Add Appointment
             </Button>
           </div>
 
@@ -224,12 +224,12 @@ export default function PetDetail() {
               {upcomingEvents.length === 0 ? (
                 <div className="text-center py-12 bg-secondary/30 rounded-xl">
                   <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-medium text-lg mb-1">No upcoming events</h3>
+                  <h3 className="font-medium text-lg mb-1">No upcoming appointments</h3>
                   <p className="text-muted-foreground mb-4">
                     Schedule a vet visit, grooming, or medication reminder
                   </p>
                   <Button onClick={() => setShowEventForm(true)}>
-                    Add First Event
+                    Add First Appointment
                   </Button>
                 </div>
               ) : (
@@ -251,9 +251,9 @@ export default function PetDetail() {
               {pastEvents.length === 0 ? (
                 <div className="text-center py-12 bg-secondary/30 rounded-xl">
                   <History className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="font-medium text-lg">No past events yet</h3>
+                  <h3 className="font-medium text-lg">No past appointments yet</h3>
                   <p className="text-muted-foreground">
-                    Past events and completed reminders will appear here
+                    Past appointments and completed reminders will appear here
                   </p>
                 </div>
               ) : (

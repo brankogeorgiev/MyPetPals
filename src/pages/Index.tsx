@@ -168,7 +168,7 @@ export default function Index() {
           <section className="space-y-4">
             <h2 className="text-xl font-display font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
-              Upcoming Events
+              Upcoming Appointments
             </h2>
             <div className="space-y-3">
               {upcomingEvents.map((event) => (

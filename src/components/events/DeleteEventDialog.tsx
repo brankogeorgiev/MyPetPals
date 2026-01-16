@@ -40,8 +40,8 @@ export function DeleteEventDialog({ open, onOpenChange, event, onSuccess }: Dele
       if (error) throw error;
       
       toast({
-        title: 'Event deleted',
-        description: 'The event has been removed.',
+        title: 'Appointment deleted',
+        description: 'The appointment has been removed.',
       });
       
       onSuccess();
@@ -50,7 +50,7 @@ export function DeleteEventDialog({ open, onOpenChange, event, onSuccess }: Dele
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to delete event. Please try again.',
+        description: error.message || 'Failed to delete appointment. Please try again.',
       });
     } finally {
       setIsDeleting(false);
@@ -61,7 +61,7 @@ export function DeleteEventDialog({ open, onOpenChange, event, onSuccess }: Dele
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete event?</AlertDialogTitle>
+          <AlertDialogTitle>Delete appointment?</AlertDialogTitle>
           <AlertDialogDescription>
             This will permanently delete "{event?.title}". This action cannot be undone.
           </AlertDialogDescription>
