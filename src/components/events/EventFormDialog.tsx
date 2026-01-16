@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { MapLocationPicker } from '@/components/ui/MapLocationPicker';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -242,12 +243,10 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="location">Location (optional)</Label>
-            <Input
-              id="location"
+            <Label>Location (optional)</Label>
+            <MapLocationPicker
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="e.g., Happy Paws Vet Clinic, 123 Main St"
+              onChange={(location) => setFormData({ ...formData, location })}
             />
           </div>
 
