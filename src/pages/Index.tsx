@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useFamilies } from '@/hooks/useFamilies';
 import { Header } from '@/components/layout/Header';
 import { PetCard } from '@/components/pets/PetCard';
 import { PetFormDialog } from '@/components/pets/PetFormDialog';
 import { DeletePetDialog } from '@/components/pets/DeletePetDialog';
+import { AssignPetFamilyDialog } from '@/components/families/AssignPetFamilyDialog';
 import { EventCard } from '@/components/events/EventCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, PawPrint, Calendar, Bell } from 'lucide-react';
+import { Plus, PawPrint, Calendar, Bell, Users } from 'lucide-react';
 import { isPast, isToday, isFuture } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -19,6 +21,7 @@ type PetEvent = Database['public']['Tables']['pet_events']['Row'] & { pet_name?:
 export default function Index() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { families, assignPetToFamily } = useFamilies();
   
   const [pets, setPets] = useState<Pet[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<PetEvent[]>([]);
@@ -27,6 +30,7 @@ export default function Index() {
   const [showPetForm, setShowPetForm] = useState(false);
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [deletingPet, setDeletingPet] = useState<Pet | null>(null);
+  const [assigningPet, setAssigningPet] = useState<Pet | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -37,10 +41,10 @@ export default function Index() {
   const fetchPets = async () => {
     if (!user) return;
     
+    // Fetch all pets (RLS handles personal + family pets)
     const { data } = await supabase
       .from('pets')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
     setPets(data || []);
@@ -237,6 +241,8 @@ export default function Index() {
                   onDelete={setDeletingPet}
                   onClick={(p) => navigate(`/pet/${p.id}`)}
                   upcomingEvents={getUpcomingEventsForPet(pet.id)}
+                  onAssignFamily={setAssigningPet}
+                  isShared={!!pet.family_id}
                 />
               ))}
             </div>
@@ -256,6 +262,15 @@ export default function Index() {
         onOpenChange={(open) => !open && setDeletingPet(null)}
         pet={deletingPet}
         onSuccess={() => { fetchPets(); fetchUpcomingEvents(); }}
+      />
+
+      <AssignPetFamilyDialog
+        open={!!assigningPet}
+        onOpenChange={(open) => !open && setAssigningPet(null)}
+        pet={assigningPet}
+        families={families}
+        onAssign={assignPetToFamily}
+        onSuccess={() => { fetchPets(); setAssigningPet(null); }}
       />
     </div>
   );

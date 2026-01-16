@@ -4,10 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
-  DropdownMenuItem, 
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, Calendar, Dog, Cat, Bird, Fish, Rabbit } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Calendar, Dog, Cat, Bird, Fish, Rabbit, Users } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
@@ -18,6 +19,8 @@ interface PetCardProps {
   onDelete: (pet: Pet) => void;
   onClick: (pet: Pet) => void;
   upcomingEvents?: number;
+  onAssignFamily?: (pet: Pet) => void;
+  isShared?: boolean;
 }
 
 const petTypeIcons: Record<string, React.ReactNode> = {
@@ -37,7 +40,7 @@ const petTypeColors: Record<string, string> = {
   other: 'bg-pet-other/10 text-pet-other border-pet-other/20',
 };
 
-export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0 }: PetCardProps) {
+export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0, onAssignFamily, isShared }: PetCardProps) {
   const formatAge = () => {
     const years = pet.age_years || 0;
     const months = pet.age_months || 0;
@@ -71,6 +74,15 @@ export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0 }: 
           </div>
         )}
         
+        {isShared && (
+          <div className="absolute top-2 left-2">
+            <Badge variant="secondary" className="gap-1 bg-background/80 backdrop-blur-sm">
+              <Users className="w-3 h-3" />
+              Shared
+            </Badge>
+          </div>
+        )}
+        
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -83,6 +95,13 @@ export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0 }: 
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
+              {onAssignFamily && (
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignFamily(pet); }}>
+                  <Users className="mr-2 h-4 w-4" />
+                  Share with Family
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={(e) => { e.stopPropagation(); onDelete(pet); }}
                 className="text-destructive focus:text-destructive"

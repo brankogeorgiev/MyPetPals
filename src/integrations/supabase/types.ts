@@ -14,6 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      families: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          invite_code?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          invite_code?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      family_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          family_id: string
+          id: string
+          invited_by: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          family_id: string
+          id?: string
+          invited_by: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          family_id?: string
+          id?: string
+          invited_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_invitations_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          family_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          family_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          family_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_members_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_events: {
         Row: {
           created_at: string
@@ -82,6 +176,7 @@ export type Database = {
           age_years: number | null
           breed: string | null
           created_at: string
+          family_id: string | null
           id: string
           name: string
           notes: string | null
@@ -95,6 +190,7 @@ export type Database = {
           age_years?: number | null
           breed?: string | null
           created_at?: string
+          family_id?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -108,6 +204,7 @@ export type Database = {
           age_years?: number | null
           breed?: string | null
           created_at?: string
+          family_id?: string | null
           id?: string
           name?: string
           notes?: string | null
@@ -116,7 +213,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pets_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -150,7 +255,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_family_ids: { Args: { _user_id: string }; Returns: string[] }
+      is_family_member: {
+        Args: { _family_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
