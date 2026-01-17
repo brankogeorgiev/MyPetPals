@@ -15,9 +15,9 @@ type Pet = Database['public']['Tables']['pets']['Row'];
 
 interface PetCardProps {
   pet: Pet;
-  onEdit: (pet: Pet) => void;
-  onDelete: (pet: Pet) => void;
-  onClick: (pet: Pet) => void;
+  onEdit?: (pet: Pet) => void;
+  onDelete?: (pet: Pet) => void;
+  onClick?: (pet: Pet) => void;
   upcomingEvents?: number;
   onAssignFamily?: (pet: Pet) => void;
   isShared?: boolean;
@@ -57,7 +57,7 @@ export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0, on
   return (
     <Card 
       className="group cursor-pointer transition-all duration-300 hover:shadow-card hover:-translate-y-1 border-0 shadow-sm overflow-hidden"
-      onClick={() => onClick(pet)}
+      onClick={() => onClick?.(pet)}
     >
       <div className="relative aspect-square overflow-hidden bg-secondary">
         {pet.photo_url ? (
@@ -83,35 +83,43 @@ export function PetCard({ pet, onEdit, onDelete, onClick, upcomingEvents = 0, on
           </div>
         )}
         
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="secondary" size="icon" className="h-8 w-8 shadow-md">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(pet); }}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              {onAssignFamily && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignFamily(pet); }}>
-                  <Users className="mr-2 h-4 w-4" />
-                  Share with Family
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={(e) => { e.stopPropagation(); onDelete(pet); }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {(onEdit || onDelete || onAssignFamily) && (
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="secondary" size="icon" className="h-8 w-8 shadow-md">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onEdit && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(pet); }}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {onAssignFamily && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAssignFamily(pet); }}>
+                    <Users className="mr-2 h-4 w-4" />
+                    Share with Family
+                  </DropdownMenuItem>
+                )}
+                {onDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={(e) => { e.stopPropagation(); onDelete(pet); }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
 
       <CardContent className="p-4">
