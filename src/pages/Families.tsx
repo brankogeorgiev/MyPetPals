@@ -111,6 +111,7 @@ export default function Families() {
                 onLeave={leaveFamily}
                 onDelete={deleteFamily}
                 onInviteEmail={inviteByEmail}
+                onClick={() => navigate(`/family/${family.id}`)}
               />
             ))}
           </div>
