@@ -255,6 +255,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      find_family_by_invite_code: {
+        Args: { _invite_code: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          invite_code: string
+          name: string
+        }[]
+      }
       get_user_family_ids: { Args: { _user_id: string }; Returns: string[] }
       is_family_member: {
         Args: { _family_id: string; _user_id: string }

@@ -86,16 +86,16 @@ export function useFamilies() {
   const joinFamilyByCode = async (inviteCode: string) => {
     if (!user) return { error: new Error('Not authenticated') };
 
-    // Find family by invite code
-    const { data: family, error: findError } = await supabase
-      .from('families')
-      .select('*')
-      .eq('invite_code', inviteCode.toUpperCase())
+    // Use RPC function to find family by invite code (bypasses RLS)
+    const { data: familyData, error: findError } = await supabase
+      .rpc('find_family_by_invite_code', { _invite_code: inviteCode.toUpperCase() })
       .single();
 
-    if (findError || !family) {
+    if (findError || !familyData) {
       return { error: new Error('Invalid invite code') };
     }
+
+    const family = familyData;
 
     // Check if already a member
     const { data: existing } = await supabase
