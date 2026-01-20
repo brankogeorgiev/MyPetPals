@@ -13,8 +13,8 @@ MyPetPals is a web application that helps pet owners manage and keep tracj of th
 | Layer | Technology |
 | :--- | :--- | 
 | Frontend | React (TypeScript) + Vite |
-| Backend | Tailwind CSS |
-| Styling | Supabase (Auth + Database) |
+| Backend | Supabase (Auth + Database) |
+| Styling | Tailwind CSS |
 | Deployment | Lovable hosting |
 
 
