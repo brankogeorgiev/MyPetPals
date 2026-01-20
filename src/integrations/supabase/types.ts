@@ -265,6 +265,18 @@ export type Database = {
           name: string
         }[]
       }
+      get_family_member_count: { Args: { _family_id: string }; Returns: number }
+      get_family_members: {
+        Args: { _family_id: string }
+        Returns: {
+          avatar_url: string
+          family_id: string
+          full_name: string
+          id: string
+          joined_at: string
+          user_id: string
+        }[]
+      }
       get_user_family_ids: { Args: { _user_id: string }; Returns: string[] }
       is_family_member: {
         Args: { _family_id: string; _user_id: string }

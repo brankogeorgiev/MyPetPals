@@ -33,21 +33,28 @@ export function useFamilies() {
       return;
     }
 
-    // For each family, get members with their profiles
+    // For each family, get members with their profiles using RPC function
     const familiesWithMembers: FamilyWithMembers[] = await Promise.all(
       familiesData.map(async (family) => {
-        const { data: members } = await supabase
-          .from('family_members')
-          .select('*, profiles(full_name, avatar_url)')
-          .eq('family_id', family.id);
+        // Use RPC functions to get accurate member data (bypasses RLS issues)
+        const [{ data: members }, { data: memberCount }] = await Promise.all([
+          supabase.rpc('get_family_members', { _family_id: family.id }),
+          supabase.rpc('get_family_member_count', { _family_id: family.id })
+        ]);
         
         return {
           ...family,
           members: (members || []).map(m => ({
-            ...m,
-            profile: m.profiles as any,
+            id: m.id,
+            family_id: m.family_id,
+            user_id: m.user_id,
+            joined_at: m.joined_at,
+            profile: {
+              full_name: m.full_name,
+              avatar_url: m.avatar_url,
+            },
           })),
-          member_count: members?.length || 0,
+          member_count: memberCount || 0,
         };
       })
     );
