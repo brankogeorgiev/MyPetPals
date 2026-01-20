@@ -18,7 +18,8 @@ import {
   UserPlus,
   LogOut,
   Trash2,
-  Mail
+  Mail,
+  Link
 } from 'lucide-react';
 import { PetCard } from '@/components/pets/PetCard';
 import { InviteMemberDialog } from '@/components/families/InviteMemberDialog';
@@ -127,6 +128,15 @@ export default function FamilyDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyInviteLink = async () => {
+    if (!family?.invite_code) return;
+    const link = `${window.location.origin}/join/${family.invite_code}`;
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast({ title: "Link copied!", description: "Share this link to invite others" });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleLeaveFamily = async () => {
     if (!user || !id) return;
 
@@ -229,12 +239,18 @@ export default function FamilyDetail() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Share this code with others so they can join your family.
+              Share this code or link with others so they can join your family.
             </p>
-            <Button variant="outline" className="w-full" onClick={() => setInviteOpen(true)}>
-              <Mail className="w-4 h-4 mr-2" />
-              Invite by Email
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={copyInviteLink}>
+                <Link className="w-4 h-4 mr-2" />
+                Copy Invite Link
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setInviteOpen(true)}>
+                <Mail className="w-4 h-4 mr-2" />
+                Invite by Email
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

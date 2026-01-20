@@ -53,10 +53,10 @@ export default function Index() {
   const fetchUpcomingEvents = async () => {
     if (!user) return;
     
+    // Fetch all events user has access to (RLS handles personal + family pet events)
     const { data: events } = await supabase
       .from('pet_events')
       .select('*, pets(name)')
-      .eq('user_id', user.id)
       .order('event_date', { ascending: true });
     
     const upcoming = (events || [])
