@@ -88,17 +88,19 @@ export default function FamilyDetail() {
 
     setFamily(familyData);
 
-    // Fetch members with profiles
+    // Fetch members with profiles using RPC function (bypasses RLS issues)
     const { data: membersData } = await supabase
-      .from('family_members')
-      .select('*, profiles(full_name, avatar_url)')
-      .eq('family_id', id)
-      .order('joined_at', { ascending: true });
+      .rpc('get_family_members', { _family_id: id });
 
     setMembers(
       (membersData || []).map((m) => ({
-        ...m,
-        profile: m.profiles as any,
+        id: m.id,
+        user_id: m.user_id,
+        joined_at: m.joined_at,
+        profile: {
+          full_name: m.full_name,
+          avatar_url: m.avatar_url,
+        },
       }))
     );
 
