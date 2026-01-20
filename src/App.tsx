@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import PetDetail from "./pages/PetDetail";
 import Families from "./pages/Families";
 import FamilyDetail from "./pages/FamilyDetail";
+import JoinFamily from "./pages/JoinFamily";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/pet/:id" element={<PetDetail />} />
             <Route path="/families" element={<Families />} />
             <Route path="/family/:id" element={<FamilyDetail />} />
+            <Route path="/join/:code" element={<JoinFamily />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

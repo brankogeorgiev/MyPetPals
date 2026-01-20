@@ -29,7 +29,8 @@ import {
   LogOut, 
   Trash2,
   Check,
-  Mail
+  Mail,
+  Link
 } from 'lucide-react';
 import type { FamilyWithMembers } from '@/hooks/useFamilies';
 
@@ -59,6 +60,17 @@ export function FamilyCard({ family, onLeave, onDelete, onInviteEmail, onClick }
     toast({
       title: "Code copied!",
       description: "Share this code with others to invite them.",
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyInviteLink = async () => {
+    const link = `${window.location.origin}/join/${family.invite_code}`;
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast({
+      title: "Link copied!",
+      description: "Share this link to invite others to your family.",
     });
     setTimeout(() => setCopied(false), 2000);
   };
@@ -153,6 +165,10 @@ export function FamilyCard({ family, onLeave, onDelete, onInviteEmail, onClick }
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); copyInviteCode(); }}>
                   {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                   Copy Invite Code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); copyInviteLink(); }}>
+                  <Link className="w-4 h-4 mr-2" />
+                  Copy Invite Link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShowInviteDialog(true); }}>
                   <Mail className="w-4 h-4 mr-2" />
