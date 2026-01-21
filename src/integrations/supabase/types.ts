@@ -118,8 +118,12 @@ export type Database = {
           id: string
           is_reminder: boolean
           location: string | null
+          parent_event_id: string | null
           pet_id: string
           photo_url: string | null
+          recurrence_end_date: string | null
+          recurrence_interval: number | null
+          recurrence_type: string | null
           reminder_completed: boolean
           reminder_hours_before: number | null
           title: string
@@ -135,8 +139,12 @@ export type Database = {
           id?: string
           is_reminder?: boolean
           location?: string | null
+          parent_event_id?: string | null
           pet_id: string
           photo_url?: string | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: string | null
           reminder_completed?: boolean
           reminder_hours_before?: number | null
           title: string
@@ -152,8 +160,12 @@ export type Database = {
           id?: string
           is_reminder?: boolean
           location?: string | null
+          parent_event_id?: string | null
           pet_id?: string
           photo_url?: string | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: string | null
           reminder_completed?: boolean
           reminder_hours_before?: number | null
           title?: string
@@ -161,6 +173,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pet_events_parent_event_id_fkey"
+            columns: ["parent_event_id"]
+            isOneToOne: false
+            referencedRelation: "pet_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pet_events_pet_id_fkey"
             columns: ["pet_id"]
