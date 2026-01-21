@@ -45,7 +45,7 @@ export function Header() {
             <div className="flex items-center justify-center w-10 h-10 rounded-xl gradient-warm shadow-warm">
               <PawPrint className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-display font-bold text-foreground">PetPal</span>
+            <span className="text-xl font-display font-bold text-foreground">MyPetPals</span>
           </div>
 
           {/* Navigation */}
