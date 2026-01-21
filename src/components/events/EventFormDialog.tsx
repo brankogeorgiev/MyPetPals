@@ -327,14 +327,14 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-display">
             {event ? 'Edit Appointment' : 'Add Appointment'}
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div className="space-y-2">
             <Label htmlFor="title">Title *</Label>
             <Input

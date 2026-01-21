@@ -34,6 +34,7 @@ export default function PetDetail() {
   const [pet, setPet] = useState<Pet | null>(null);
   const [events, setEvents] = useState<PetEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null);
@@ -234,7 +235,7 @@ export default function PetDetail() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {upcomingEvents.map((event) => (
+                  {(showAllUpcoming ? upcomingEvents : upcomingEvents.slice(0, 3)).map((event) => (
                     <EventCard
                       key={event.id}
                       event={event}
@@ -243,6 +244,24 @@ export default function PetDetail() {
                       onToggleComplete={handleToggleComplete}
                     />
                   ))}
+                  {upcomingEvents.length > 3 && !showAllUpcoming && (
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={() => setShowAllUpcoming(true)}
+                    >
+                      Show {upcomingEvents.length - 3} More Appointments
+                    </Button>
+                  )}
+                  {showAllUpcoming && upcomingEvents.length > 3 && (
+                    <Button 
+                      variant="ghost" 
+                      className="w-full" 
+                      onClick={() => setShowAllUpcoming(false)}
+                    >
+                      Show Less
+                    </Button>
+                  )}
                 </div>
               )}
             </TabsContent>
