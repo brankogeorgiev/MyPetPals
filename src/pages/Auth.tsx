@@ -93,7 +93,7 @@ export default function Auth() {
       });
     } else {
       toast({
-        title: 'Welcome to PetPal!',
+        title: 'Welcome to MyPetPals!',
         description: 'Your account has been created successfully.',
       });
       navigate('/');
@@ -107,7 +107,7 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-warm shadow-warm mb-4">
             <PawPrint className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-foreground">PetPal</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground">MyPetPals</h1>
           <p className="text-muted-foreground mt-2">Your pet care companion</p>
         </div>
 
