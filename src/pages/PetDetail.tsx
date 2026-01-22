@@ -12,10 +12,12 @@ import { DeleteEventDialog } from '@/components/events/DeleteEventDialog';
 import { RecurringSeriesCard } from '@/components/events/RecurringSeriesCard';
 import { RecurringSeriesDialog } from '@/components/events/RecurringSeriesDialog';
 import { ShiftRecurringDialog } from '@/components/events/ShiftRecurringDialog';
+import { AppointmentFilters, FilterState } from '@/components/events/AppointmentFilters';
 import { PetFormDialog } from '@/components/pets/PetFormDialog';
 import { DeletePetDialog } from '@/components/pets/DeletePetDialog';
 import { ArrowLeft, Plus, Pencil, Trash2, Calendar, History, Dog, Cat, Bird, Fish, Rabbit } from 'lucide-react';
-import { isPast, isToday } from 'date-fns';
+import { isPast, isToday, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
 type Pet = Database['public']['Tables']['pets']['Row'];
@@ -33,6 +35,7 @@ export default function PetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   
   const [pet, setPet] = useState<Pet | null>(null);
   const [events, setEvents] = useState<PetEvent[]>([]);
@@ -41,11 +44,20 @@ export default function PetDetail() {
   
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null);
+  const [editingSeries, setEditingSeries] = useState<PetEvent | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<PetEvent | null>(null);
   
   // Recurring series state
   const [selectedSeries, setSelectedSeries] = useState<{ parent: PetEvent; children: PetEvent[] } | null>(null);
   const [shiftingEvent, setShiftingEvent] = useState<{ event: PetEvent; allEvents: PetEvent[] } | null>(null);
+  
+  // Filter state
+  const [filters, setFilters] = useState<FilterState>({
+    eventType: null,
+    dateFrom: '',
+    dateTo: '',
+    remindersOnly: false,
+  });
   
   const [showPetForm, setShowPetForm] = useState(false);
   const [showDeletePet, setShowDeletePet] = useState(false);
@@ -108,6 +120,38 @@ export default function PetDetail() {
     }
   };
 
+  // Apply filters to events
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      // Type filter
+      if (filters.eventType && event.event_type !== filters.eventType) {
+        return false;
+      }
+      
+      // Reminders only filter
+      if (filters.remindersOnly && !event.is_reminder) {
+        return false;
+      }
+      
+      // Date range filter
+      const eventDate = new Date(event.event_date);
+      if (filters.dateFrom) {
+        const fromDate = startOfDay(parseISO(filters.dateFrom));
+        if (eventDate < fromDate) {
+          return false;
+        }
+      }
+      if (filters.dateTo) {
+        const toDate = endOfDay(parseISO(filters.dateTo));
+        if (eventDate > toDate) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [events, filters]);
+
   // Group events: separate recurring series from standalone events
   const { groupedUpcoming, groupedPast, standaloneUpcoming, standalonePast } = useMemo(() => {
     const now = new Date();
@@ -116,7 +160,7 @@ export default function PetDetail() {
     const parentEventIds = new Set<string>();
     const childToParentMap = new Map<string, string>();
     
-    events.forEach(e => {
+    filteredEvents.forEach(e => {
       if (e.parent_event_id) {
         parentEventIds.add(e.parent_event_id);
         childToParentMap.set(e.id, e.parent_event_id);
@@ -124,7 +168,7 @@ export default function PetDetail() {
     });
     
     // Also include events that set recurrence but might not have children yet
-    events.forEach(e => {
+    filteredEvents.forEach(e => {
       if (e.recurrence_type && e.recurrence_type !== 'none' && !e.parent_event_id) {
         parentEventIds.add(e.id);
       }
@@ -133,7 +177,7 @@ export default function PetDetail() {
     // Group children by parent
     const seriesMap = new Map<string, { parent: PetEvent; children: PetEvent[] }>();
     
-    events.forEach(e => {
+    filteredEvents.forEach(e => {
       if (parentEventIds.has(e.id) && !e.parent_event_id) {
         // This is a parent event
         if (!seriesMap.has(e.id)) {
@@ -179,7 +223,7 @@ export default function PetDetail() {
       series.children.forEach(c => seriesEventIds.add(c.id));
     });
     
-    const standaloneEvents = events.filter(e => !seriesEventIds.has(e.id));
+    const standaloneEvents = filteredEvents.filter(e => !seriesEventIds.has(e.id));
     
     const standaloneUpcomingList = standaloneEvents.filter(e => 
       !isPast(new Date(e.event_date)) || isToday(new Date(e.event_date))
@@ -195,7 +239,53 @@ export default function PetDetail() {
       standaloneUpcoming: standaloneUpcomingList,
       standalonePast: standalonePastList,
     };
-  }, [events]);
+  }, [filteredEvents]);
+
+  // Handle updating all events in a series
+  const handleUpdateSeries = async (parentEvent: PetEvent, updates: Partial<PetEvent>) => {
+    try {
+      // Get all events in the series
+      const allEventIds = [parentEvent.id];
+      const { data: childEvents } = await supabase
+        .from('pet_events')
+        .select('id')
+        .eq('parent_event_id', parentEvent.id);
+      
+      if (childEvents) {
+        allEventIds.push(...childEvents.map(e => e.id));
+      }
+
+      // Update all events with the shared properties
+      const { error } = await supabase
+        .from('pet_events')
+        .update({
+          title: updates.title,
+          event_type: updates.event_type,
+          custom_type: updates.custom_type,
+          location: updates.location,
+          description: updates.description,
+          is_reminder: updates.is_reminder,
+          reminder_hours_before: updates.reminder_hours_before,
+        })
+        .in('id', allEventIds);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Series updated',
+        description: `Updated ${allEventIds.length} appointments.`,
+      });
+
+      fetchEvents();
+      setSelectedSeries(null);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update series.',
+      });
+    }
+  };
 
   // Calculate total counts for tabs
   const upcomingCount = groupedUpcoming.length + standaloneUpcoming.length;
@@ -324,13 +414,16 @@ export default function PetDetail() {
 
         {/* Events Section */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-xl font-display font-semibold">Appointments & Reminders</h2>
-            <Button onClick={() => { setEditingEvent(null); setShowEventForm(true); }} className="gap-2">
+            <Button onClick={() => { setEditingEvent(null); setEditingSeries(null); setShowEventForm(true); }} className="gap-2">
               <Plus className="w-4 h-4" />
               Add Appointment
             </Button>
           </div>
+
+          {/* Filters */}
+          <AppointmentFilters filters={filters} onFiltersChange={setFilters} />
 
           <Tabs defaultValue="upcoming" className="w-full">
             <TabsList>
@@ -435,10 +528,16 @@ export default function PetDetail() {
 
       <EventFormDialog
         open={showEventForm}
-        onOpenChange={setShowEventForm}
+        onOpenChange={(open) => {
+          setShowEventForm(open);
+          if (!open) {
+            setEditingSeries(null);
+          }
+        }}
         event={editingEvent}
         petId={pet.id}
         onSuccess={fetchEvents}
+        isSeriesEdit={!!editingSeries}
       />
 
       <DeleteEventDialog
@@ -454,7 +553,7 @@ export default function PetDetail() {
           onOpenChange={(open) => !open && setSelectedSeries(null)}
           parentEvent={selectedSeries.parent}
           childEvents={selectedSeries.children}
-          onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
+          onEdit={(e) => { setEditingEvent(e); setEditingSeries(null); setShowEventForm(true); }}
           onDelete={setDeletingEvent}
           onSuccess={() => {
             fetchEvents();
@@ -464,6 +563,12 @@ export default function PetDetail() {
               event,
               allEvents: [selectedSeries.parent, ...selectedSeries.children]
             });
+          }}
+          onEditSeries={(parent) => {
+            setEditingSeries(parent);
+            setEditingEvent(parent);
+            setShowEventForm(true);
+            setSelectedSeries(null);
           }}
         />
       )}

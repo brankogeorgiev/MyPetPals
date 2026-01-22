@@ -23,6 +23,7 @@ interface EventFormDialogProps {
   event?: PetEvent | null;
   petId: string;
   onSuccess: () => void;
+  isSeriesEdit?: boolean;
 }
 
 const appointmentTypes = [
@@ -60,7 +61,7 @@ const getIntervalLabel = (type: string) => {
   }
 };
 
-export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }: EventFormDialogProps) {
+export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess, isSeriesEdit = false }: EventFormDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -194,17 +195,28 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
     e.preventDefault();
     if (!user) return;
     
-    if (!formData.title.trim() || !formData.event_date || !formData.event_time) {
+    // For series edit, we only require title
+    if (!formData.title.trim()) {
       toast({
         variant: 'destructive',
         title: 'Missing information',
-        description: 'Please provide a title, date, and time.',
+        description: 'Please provide a title.',
       });
       return;
     }
 
-    // Validate recurrence end date
-    if (formData.recurrence_type !== 'none' && !formData.recurrence_end_date) {
+    // For non-series edits, require date and time
+    if (!isSeriesEdit && (!formData.event_date || !formData.event_time)) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing information',
+        description: 'Please provide a date and time.',
+      });
+      return;
+    }
+
+    // Validate recurrence end date (only for new events)
+    if (!event && !isSeriesEdit && formData.recurrence_type !== 'none' && !formData.recurrence_end_date) {
       toast({
         variant: 'destructive',
         title: 'Missing end date',
@@ -247,18 +259,53 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
       };
       
       if (event) {
-        // For updates, just update the single event (not creating new recurring instances)
-        const { error } = await supabase
-          .from('pet_events')
-          .update(baseEventData)
-          .eq('id', event.id);
-        
-        if (error) throw error;
-        
-        toast({
-          title: 'Appointment updated',
-          description: 'The appointment has been updated successfully.',
-        });
+        if (isSeriesEdit) {
+          // Update all events in the series with shared properties
+          const allEventIds = [event.id];
+          const { data: childEvents } = await supabase
+            .from('pet_events')
+            .select('id')
+            .eq('parent_event_id', event.id);
+          
+          if (childEvents) {
+            allEventIds.push(...childEvents.map(e => e.id));
+          }
+
+          // Update shared properties across all series events (not dates)
+          const { error } = await supabase
+            .from('pet_events')
+            .update({
+              title: formData.title.trim(),
+              event_type: formData.event_type,
+              custom_type: formData.event_type === 'other' ? formData.custom_type.trim() || null : null,
+              location: formData.location.trim() || null,
+              description: formData.description.trim() || null,
+              is_reminder: formData.is_reminder,
+              reminder_hours_before: formData.is_reminder ? formData.reminder_hours_before : null,
+              photo_url: photoUrl,
+            })
+            .in('id', allEventIds);
+
+          if (error) throw error;
+
+          toast({
+            title: 'Series updated',
+            description: `Updated ${allEventIds.length} appointments.`,
+          });
+        } else {
+          // For single event updates
+          const { error } = await supabase
+            .from('pet_events')
+            .update(baseEventData)
+            .eq('id', event.id);
+          
+          if (error) throw error;
+          
+          toast({
+            title: 'Appointment updated',
+            description: 'The appointment has been updated successfully.',
+          });
+        }
       } else {
         // For new events with recurrence, create all instances
         if (formData.recurrence_type !== 'none' && recurrenceEndDate) {
@@ -330,8 +377,13 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="font-display">
-            {event ? 'Edit Appointment' : 'Add Appointment'}
+            {isSeriesEdit ? 'Edit All Appointments in Series' : event ? 'Edit Appointment' : 'Add Appointment'}
           </DialogTitle>
+          {isSeriesEdit && (
+            <p className="text-sm text-muted-foreground">
+              Changes will apply to all appointments in this recurring series.
+            </p>
+          )}
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-2">
@@ -383,90 +435,95 @@ export function EventFormDialog({ open, onOpenChange, event, petId, onSuccess }:
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="event_date">Date *</Label>
-              <Input
-                id="event_date"
-                type="date"
-                value={formData.event_date}
-                onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="event_time">Time *</Label>
-              <Input
-                id="event_time"
-                type="time"
-                value={formData.event_time}
-                onChange={(e) => setFormData({ ...formData, event_time: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Recurrence Section */}
-          <div className="space-y-3 p-3 rounded-lg bg-muted/50 border">
-            <div className="flex items-center gap-2">
-              <Repeat className="w-4 h-4 text-muted-foreground" />
-              <Label className="font-medium">Repeat</Label>
-            </div>
-            
-            <div className="space-y-2">
-              <Select
-                value={formData.recurrence_type}
-                onValueChange={(value) => setFormData({ ...formData, recurrence_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {recurrenceTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.recurrence_type !== 'none' && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={formData.recurrence_interval.toString()}
-                    onValueChange={(value) => setFormData({ ...formData, recurrence_interval: parseInt(value) })}
-                  >
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {recurrenceIntervals.map((interval) => (
-                        <SelectItem key={interval.value} value={interval.value.toString()}>
-                          {interval.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm text-muted-foreground">
-                    {getIntervalLabel(formData.recurrence_type)}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="recurrence_end_date">End date *</Label>
-                  <Input
-                    id="recurrence_end_date"
-                    type="date"
-                    value={formData.recurrence_end_date}
-                    onChange={(e) => setFormData({ ...formData, recurrence_end_date: e.target.value })}
-                    min={formData.event_date}
-                    required={formData.recurrence_type !== 'none'}
-                  />
-                </div>
+          {/* Date/Time - hide when editing series (dates are managed separately) */}
+          {!isSeriesEdit && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="event_date">Date *</Label>
+                <Input
+                  id="event_date"
+                  type="date"
+                  value={formData.event_date}
+                  onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
+                  required
+                />
               </div>
-            )}
-          </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="event_time">Time *</Label>
+                <Input
+                  id="event_time"
+                  type="time"
+                  value={formData.event_time}
+                  onChange={(e) => setFormData({ ...formData, event_time: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Recurrence Section - hide when editing existing event or series */}
+          {!event && !isSeriesEdit && (
+            <div className="space-y-3 p-3 rounded-lg bg-muted/50 border">
+              <div className="flex items-center gap-2">
+                <Repeat className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Repeat</Label>
+              </div>
+              
+              <div className="space-y-2">
+                <Select
+                  value={formData.recurrence_type}
+                  onValueChange={(value) => setFormData({ ...formData, recurrence_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recurrenceTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.recurrence_type !== 'none' && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={formData.recurrence_interval.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, recurrence_interval: parseInt(value) })}
+                    >
+                      <SelectTrigger className="w-[120px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {recurrenceIntervals.map((interval) => (
+                          <SelectItem key={interval.value} value={interval.value.toString()}>
+                            {interval.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">
+                      {getIntervalLabel(formData.recurrence_type)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrence_end_date">End date *</Label>
+                    <Input
+                      id="recurrence_end_date"
+                      type="date"
+                      value={formData.recurrence_end_date}
+                      onChange={(e) => setFormData({ ...formData, recurrence_end_date: e.target.value })}
+                      min={formData.event_date}
+                      required={formData.recurrence_type !== 'none'}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">

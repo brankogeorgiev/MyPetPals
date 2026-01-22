@@ -4,15 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator 
 } from '@/components/ui/dropdown-menu';
-import { Repeat, MoreHorizontal, Pencil, Trash2, Stethoscope, Scissors, Pill, Calendar, Clock, MapPin, CalendarClock } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Repeat, MoreHorizontal, Pencil, Trash2, Stethoscope, Scissors, Pill, Calendar, Clock, MapPin, CalendarClock, Settings } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +38,7 @@ interface RecurringSeriesDialogProps {
   onDelete: (event: PetEvent) => void;
   onSuccess: () => void;
   onShiftDates: (event: PetEvent) => void;
+  onEditSeries?: (parentEvent: PetEvent) => void;
 }
 
 const appointmentTypeConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
@@ -47,10 +57,13 @@ export function RecurringSeriesDialog({
   onEdit,
   onDelete,
   onSuccess,
-  onShiftDates 
+  onShiftDates,
+  onEditSeries
 }: RecurringSeriesDialogProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   
   const config = appointmentTypeConfig[parentEvent.event_type] || appointmentTypeConfig.other;
   const displayLabel = parentEvent.event_type === 'other' && parentEvent.custom_type ? parentEvent.custom_type : config.label;
@@ -82,6 +95,46 @@ export function RecurringSeriesDialog({
     setIsUpdating(null);
   };
 
+  const handleDeleteAllSeries = async () => {
+    setIsDeletingAll(true);
+    try {
+      // Delete all child events first (they reference parent)
+      if (childEvents.length > 0) {
+        const { error: childError } = await supabase
+          .from('pet_events')
+          .delete()
+          .eq('parent_event_id', parentEvent.id);
+        
+        if (childError) throw childError;
+      }
+      
+      // Delete parent event
+      const { error: parentError } = await supabase
+        .from('pet_events')
+        .delete()
+        .eq('id', parentEvent.id);
+      
+      if (parentError) throw parentError;
+      
+      toast({
+        title: 'Series deleted',
+        description: `Deleted ${allEvents.length} appointments.`,
+      });
+      
+      onOpenChange(false);
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to delete series.',
+      });
+    } finally {
+      setIsDeletingAll(false);
+      setShowDeleteAllConfirm(false);
+    }
+  };
+
   const EventItem = ({ event }: { event: PetEvent }) => {
     const eventDate = new Date(event.event_date);
     const isCompleted = event.reminder_completed;
@@ -110,7 +163,7 @@ export function RecurringSeriesDialog({
                 <Badge variant="destructive" className="text-xs">Overdue</Badge>
               )}
               {isParent && (
-                <Badge variant="outline" className="text-xs">Parent</Badge>
+                <Badge variant="outline" className="text-xs">First</Badge>
               )}
             </div>
             
@@ -141,7 +194,7 @@ export function RecurringSeriesDialog({
                 onEdit(event);
               }}>
                 <Pencil className="mr-2 h-4 w-4" />
-                Edit
+                Edit This Appointment
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
                 onOpenChange(false);
@@ -150,6 +203,7 @@ export function RecurringSeriesDialog({
                 <CalendarClock className="mr-2 h-4 w-4" />
                 Change Date & Shift All
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => {
                   onOpenChange(false);
@@ -158,7 +212,7 @@ export function RecurringSeriesDialog({
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                Delete This Appointment
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -168,64 +222,114 @@ export function RecurringSeriesDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Repeat className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="font-display">{parentEvent.title}</DialogTitle>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className={config.color}>
-                  {config.icon}
-                  <span className="ml-1">{displayLabel}</span>
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {allEvents.length} appointments
-                </span>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Repeat className="w-5 h-5 text-primary" />
               </div>
-            </div>
-          </div>
-        </DialogHeader>
-        
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-4 pb-4">
-            {upcomingEvents.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Upcoming ({upcomingEvents.length})
-                </h3>
-                <div className="space-y-2">
-                  {upcomingEvents.map((event) => (
-                    <EventItem key={event.id} event={event} />
-                  ))}
+              <div className="flex-1">
+                <DialogTitle className="font-display">{parentEvent.title}</DialogTitle>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className={config.color}>
+                    {config.icon}
+                    <span className="ml-1">{displayLabel}</span>
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {allEvents.length} appointments
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+            <div className="space-y-4 py-2">
+              {upcomingEvents.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1">
+                    Upcoming ({upcomingEvents.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {upcomingEvents.map((event) => (
+                      <EventItem key={event.id} event={event} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {pastEvents.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1">
+                    Past ({pastEvents.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {pastEvents.map((event) => (
+                      <EventItem key={event.id} event={event} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          
+          <div className="flex items-center justify-between pt-4 border-t shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings className="w-4 h-4" />
+                  Series Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => {
+                  onOpenChange(false);
+                  onEditSeries?.(parentEvent);
+                }}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit All Appointments
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Entire Series
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
-            {pastEvents.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Past ({pastEvents.length})
-                </h3>
-                <div className="space-y-2">
-                  {pastEvents.map((event) => (
-                    <EventItem key={event.id} event={event} />
-                  ))}
-                </div>
-              </div>
-            )}
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
-        </ScrollArea>
-        
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showDeleteAllConfirm} onOpenChange={setShowDeleteAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Entire Series?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {allEvents.length} appointments in this recurring series. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteAllSeries}
+              disabled={isDeletingAll}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingAll ? 'Deleting...' : `Delete ${allEvents.length} Appointments`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
