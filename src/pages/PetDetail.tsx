@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EventCard } from '@/components/events/EventCard';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
 import { DeleteEventDialog } from '@/components/events/DeleteEventDialog';
+import { RecurringSeriesCard } from '@/components/events/RecurringSeriesCard';
+import { RecurringSeriesDialog } from '@/components/events/RecurringSeriesDialog';
+import { ShiftRecurringDialog } from '@/components/events/ShiftRecurringDialog';
 import { PetFormDialog } from '@/components/pets/PetFormDialog';
 import { DeletePetDialog } from '@/components/pets/DeletePetDialog';
 import { ArrowLeft, Plus, Pencil, Trash2, Calendar, History, Dog, Cat, Bird, Fish, Rabbit } from 'lucide-react';
@@ -39,6 +42,10 @@ export default function PetDetail() {
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PetEvent | null>(null);
   const [deletingEvent, setDeletingEvent] = useState<PetEvent | null>(null);
+  
+  // Recurring series state
+  const [selectedSeries, setSelectedSeries] = useState<{ parent: PetEvent; children: PetEvent[] } | null>(null);
+  const [shiftingEvent, setShiftingEvent] = useState<{ event: PetEvent; allEvents: PetEvent[] } | null>(null);
   
   const [showPetForm, setShowPetForm] = useState(false);
   const [showDeletePet, setShowDeletePet] = useState(false);
@@ -101,13 +108,129 @@ export default function PetDetail() {
     }
   };
 
-  const upcomingEvents = events.filter(e => 
-    !isPast(new Date(e.event_date)) || isToday(new Date(e.event_date))
-  ).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
-  
-  const pastEvents = events.filter(e => 
-    isPast(new Date(e.event_date)) && !isToday(new Date(e.event_date))
-  );
+  // Group events: separate recurring series from standalone events
+  const { groupedUpcoming, groupedPast, standaloneUpcoming, standalonePast } = useMemo(() => {
+    const now = new Date();
+    
+    // Find parent events (those that have children referencing them OR have recurrence_type set)
+    const parentEventIds = new Set<string>();
+    const childToParentMap = new Map<string, string>();
+    
+    events.forEach(e => {
+      if (e.parent_event_id) {
+        parentEventIds.add(e.parent_event_id);
+        childToParentMap.set(e.id, e.parent_event_id);
+      }
+    });
+    
+    // Also include events that set recurrence but might not have children yet
+    events.forEach(e => {
+      if (e.recurrence_type && e.recurrence_type !== 'none' && !e.parent_event_id) {
+        parentEventIds.add(e.id);
+      }
+    });
+    
+    // Group children by parent
+    const seriesMap = new Map<string, { parent: PetEvent; children: PetEvent[] }>();
+    
+    events.forEach(e => {
+      if (parentEventIds.has(e.id) && !e.parent_event_id) {
+        // This is a parent event
+        if (!seriesMap.has(e.id)) {
+          seriesMap.set(e.id, { parent: e, children: [] });
+        } else {
+          seriesMap.get(e.id)!.parent = e;
+        }
+      } else if (e.parent_event_id && parentEventIds.has(e.parent_event_id)) {
+        // This is a child event
+        if (!seriesMap.has(e.parent_event_id)) {
+          // Parent might not be found yet, create placeholder
+          seriesMap.set(e.parent_event_id, { parent: null as any, children: [e] });
+        } else {
+          seriesMap.get(e.parent_event_id)!.children.push(e);
+        }
+      }
+    });
+    
+    // Filter valid series (must have parent)
+    const validSeries = Array.from(seriesMap.values()).filter(s => s.parent);
+    
+    // Check if series has any upcoming events
+    const upcomingSeries: typeof validSeries = [];
+    const pastSeries: typeof validSeries = [];
+    
+    validSeries.forEach(series => {
+      const allSeriesEvents = [series.parent, ...series.children];
+      const hasUpcoming = allSeriesEvents.some(e => 
+        !isPast(new Date(e.event_date)) || isToday(new Date(e.event_date))
+      );
+      
+      if (hasUpcoming) {
+        upcomingSeries.push(series);
+      } else {
+        pastSeries.push(series);
+      }
+    });
+    
+    // Get standalone events (not part of any series)
+    const seriesEventIds = new Set<string>();
+    validSeries.forEach(series => {
+      seriesEventIds.add(series.parent.id);
+      series.children.forEach(c => seriesEventIds.add(c.id));
+    });
+    
+    const standaloneEvents = events.filter(e => !seriesEventIds.has(e.id));
+    
+    const standaloneUpcomingList = standaloneEvents.filter(e => 
+      !isPast(new Date(e.event_date)) || isToday(new Date(e.event_date))
+    ).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+    
+    const standalonePastList = standaloneEvents.filter(e => 
+      isPast(new Date(e.event_date)) && !isToday(new Date(e.event_date))
+    ).sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime());
+    
+    return {
+      groupedUpcoming: upcomingSeries,
+      groupedPast: pastSeries,
+      standaloneUpcoming: standaloneUpcomingList,
+      standalonePast: standalonePastList,
+    };
+  }, [events]);
+
+  // Calculate total counts for tabs
+  const upcomingCount = groupedUpcoming.length + standaloneUpcoming.length;
+  const pastCount = groupedPast.length + standalonePast.length;
+
+  // Combined list for display with Show More
+  const upcomingDisplayItems = useMemo(() => {
+    const items: Array<{ type: 'series' | 'standalone'; data: any }> = [];
+    
+    // Add series items first
+    groupedUpcoming.forEach(series => {
+      items.push({ type: 'series', data: series });
+    });
+    
+    // Add standalone items
+    standaloneUpcoming.forEach(event => {
+      items.push({ type: 'standalone', data: event });
+    });
+    
+    return items;
+  }, [groupedUpcoming, standaloneUpcoming]);
+
+  const pastDisplayItems = useMemo(() => {
+    const items: Array<{ type: 'series' | 'standalone'; data: any }> = [];
+    
+    groupedPast.forEach(series => {
+      items.push({ type: 'series', data: series });
+    });
+    
+    standalonePast.forEach(event => {
+      items.push({ type: 'standalone', data: event });
+    });
+    
+    return items;
+  }, [groupedPast, standalonePast]);
 
   const formatAge = () => {
     if (!pet) return '';
@@ -189,11 +312,11 @@ export default function PetDetail() {
             <div className="flex gap-3 mt-4">
               <Badge variant="outline" className="text-sm">
                 <Calendar className="w-4 h-4 mr-1" />
-                {upcomingEvents.length} upcoming
+                {upcomingCount} upcoming
               </Badge>
               <Badge variant="outline" className="text-sm">
                 <History className="w-4 h-4 mr-1" />
-                {pastEvents.length} past
+                {pastCount} past
               </Badge>
             </div>
           </div>
@@ -213,16 +336,16 @@ export default function PetDetail() {
             <TabsList>
               <TabsTrigger value="upcoming" className="gap-2">
                 <Calendar className="w-4 h-4" />
-                Upcoming ({upcomingEvents.length})
+                Upcoming ({upcomingCount})
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-2">
                 <History className="w-4 h-4" />
-                History ({pastEvents.length})
+                History ({pastCount})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upcoming" className="mt-4">
-              {upcomingEvents.length === 0 ? (
+              {upcomingDisplayItems.length === 0 ? (
                 <div className="text-center py-12 bg-secondary/30 rounded-xl">
                   <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                   <h3 className="font-medium text-lg mb-1">No upcoming appointments</h3>
@@ -235,25 +358,34 @@ export default function PetDetail() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {(showAllUpcoming ? upcomingEvents : upcomingEvents.slice(0, 3)).map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
-                      onDelete={setDeletingEvent}
-                      onToggleComplete={handleToggleComplete}
-                    />
+                  {(showAllUpcoming ? upcomingDisplayItems : upcomingDisplayItems.slice(0, 3)).map((item, index) => (
+                    item.type === 'series' ? (
+                      <RecurringSeriesCard
+                        key={`series-${item.data.parent.id}`}
+                        parentEvent={item.data.parent}
+                        childEvents={item.data.children}
+                        onClick={() => setSelectedSeries(item.data)}
+                      />
+                    ) : (
+                      <EventCard
+                        key={item.data.id}
+                        event={item.data}
+                        onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
+                        onDelete={setDeletingEvent}
+                        onToggleComplete={handleToggleComplete}
+                      />
+                    )
                   ))}
-                  {upcomingEvents.length > 3 && !showAllUpcoming && (
+                  {upcomingDisplayItems.length > 3 && !showAllUpcoming && (
                     <Button 
                       variant="outline" 
                       className="w-full" 
                       onClick={() => setShowAllUpcoming(true)}
                     >
-                      Show {upcomingEvents.length - 3} More Appointments
+                      Show {upcomingDisplayItems.length - 3} More
                     </Button>
                   )}
-                  {showAllUpcoming && upcomingEvents.length > 3 && (
+                  {showAllUpcoming && upcomingDisplayItems.length > 3 && (
                     <Button 
                       variant="ghost" 
                       className="w-full" 
@@ -267,7 +399,7 @@ export default function PetDetail() {
             </TabsContent>
 
             <TabsContent value="history" className="mt-4">
-              {pastEvents.length === 0 ? (
+              {pastDisplayItems.length === 0 ? (
                 <div className="text-center py-12 bg-secondary/30 rounded-xl">
                   <History className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                   <h3 className="font-medium text-lg">No past appointments yet</h3>
@@ -277,13 +409,22 @@ export default function PetDetail() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pastEvents.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
-                      onDelete={setDeletingEvent}
-                    />
+                  {pastDisplayItems.map((item) => (
+                    item.type === 'series' ? (
+                      <RecurringSeriesCard
+                        key={`series-${item.data.parent.id}`}
+                        parentEvent={item.data.parent}
+                        childEvents={item.data.children}
+                        onClick={() => setSelectedSeries(item.data)}
+                      />
+                    ) : (
+                      <EventCard
+                        key={item.data.id}
+                        event={item.data}
+                        onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
+                        onDelete={setDeletingEvent}
+                      />
+                    )
                   ))}
                 </div>
               )}
@@ -306,6 +447,41 @@ export default function PetDetail() {
         event={deletingEvent}
         onSuccess={fetchEvents}
       />
+
+      {selectedSeries && (
+        <RecurringSeriesDialog
+          open={!!selectedSeries}
+          onOpenChange={(open) => !open && setSelectedSeries(null)}
+          parentEvent={selectedSeries.parent}
+          childEvents={selectedSeries.children}
+          onEdit={(e) => { setEditingEvent(e); setShowEventForm(true); }}
+          onDelete={setDeletingEvent}
+          onSuccess={() => {
+            fetchEvents();
+          }}
+          onShiftDates={(event) => {
+            setShiftingEvent({
+              event,
+              allEvents: [selectedSeries.parent, ...selectedSeries.children]
+            });
+          }}
+        />
+      )}
+
+      {shiftingEvent && (
+        <ShiftRecurringDialog
+          open={!!shiftingEvent}
+          onOpenChange={(open) => {
+            if (!open) setShiftingEvent(null);
+          }}
+          event={shiftingEvent.event}
+          allSeriesEvents={shiftingEvent.allEvents}
+          onSuccess={() => {
+            fetchEvents();
+            setSelectedSeries(null);
+          }}
+        />
+      )}
 
       <PetFormDialog
         open={showPetForm}
